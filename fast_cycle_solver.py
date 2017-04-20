@@ -59,7 +59,7 @@ class Cycle:
 		n_lbl_N, n_lbl_1 = self.n_labels[self.n_nodes - 1], self.n_labels[0]
 
 		_theta    = np.reshape(self.theta[self.n_nodes - 1, 0:n_lbl_N*n_lbl_1], [n_lbl_N, n_lbl_1])
-		self.delta[self.n_nodes-2, 0:self.n_labels[self.n_nodes-1]] = np.min(self.theta[self.n_nodes - 1, 
+#		self.delta[self.n_nodes-2, 0:self.n_labels[self.n_nodes-1]] = np.min(self.theta[self.n_nodes - 1, 
 
 	def minsum(self, i):
 		# Calculates the minsum for \Delta^*_{i-1} and \theta_{i-1}. 
