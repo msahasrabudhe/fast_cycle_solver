@@ -6,6 +6,8 @@
 # References:
 # [1]: A Fast and Exact Energy Minimization Algorithm for Cycle MRFs, H. Wang, D. Koller, ICML 2013.
 
+import numpy as np
+
 class Cycle:
 	# A class for a cycle MRFs: MRFs defined on graphs that are simple cycles: 
 	#   X1 --- X2 --- ... --- XN --- X1
@@ -26,6 +28,8 @@ class Cycle:
 			self.n_labels = n_labels + np.zeros(self.n_nodes)
 		elif n_labels.size == self.n_nodes:
 			self.n_labels = n_labels
+		# Convert self.n_labels to an int array
+		self.n_labels = self.n_labels.astype(np.int)
 
 		# The maximum label a node can take.
 		self.max_n_labels = np.max(self.n_labels)
@@ -33,13 +37,13 @@ class Cycle:
 		# Initialise messages.
 
 		# Clique tree messages, \Delta^*_i in the paper. 
-		self.Delta     = np.zeros((self.n_nodes - 1, self.n_labels[0]*self.max_n_labels))
+		self.Delta     = np.zeros((self.n_nodes - 1, self.n_labels[0], self.max_n_labels))
 		# Original energy terms. \theta_i in the paper. 
-		self.theta     = np.zeros((self.n_nodes, self.max_n_labels*self.max_n_labels))
+		self.theta     = np.zeros((self.n_nodes, self.max_n_labels, self.max_n_labels))
 		# Indicator variables to denote whether a message is active or not. These variables
 		#    respectively determine \Delta^+_i and \theta^+_i in the paper.
-		self.D_active  = np.zeros((self.n_nodes - 1, self.n_labels[0]*self.max_n_labels), dtype=np.bool)  
-		self.t_active  = np.zeros((self.n_nodes, self.n_labels[0]*self.max_n_labels), dtype=np.bool)
+		self.D_active  = np.zeros((self.n_nodes - 1, self.n_labels[0], self.max_n_labels), dtype=np.bool)  
+		self.t_active  = np.zeros((self.n_nodes, self.n_labels[0], self.max_n_labels), dtype=np.bool)
 
 		# Messages on cycle edges
 		self.delta     = np.zeros((self.n_nodes - 1, self.max_n_labels))
@@ -63,7 +67,6 @@ class Cycle:
 
 	def minsum(self, i):
 		# Calculates the minsum for \Delta^*_{i-1} and \theta_{i-1}. 
-		# Returns the minimum as well as the index of the minimum. 
 		
 		# The input index, i, cannot be less than 1 as the messages \Delta^* start from
 		#    index 1. 
@@ -71,17 +74,24 @@ class Cycle:
 			print 'Cycle.minsum(): Invalid index: %d. The input index must be greater than 0.' %(i)
 			raise ValueError
 		
-		# We decrease i by 1, as the class does not store anything for \Delta^*_1. 
-		i = i - 1
+		# If i == 1, the minsum is equal to \theta_{i-1}
 		# The arrays for which we perform a minsum. 
-		_d       = self.Delta[i, :]
-		_t       = self.theta[i, :]
-		# The minsum is just the sum of the minimum values in these two arrays. 
-		min_l_d  = np.argmin(_d)
-		min_l_t  = np.argmin(_t)
-		m_sum    = _d[min_l_d] + _t[min_l_t]
+		_d        = self.Delta[i-1, 0:self.n_labels[0], 0:self.n_labels[i-1]]
+		_t        = self.theta[i-1, 0:self.n_labels[i-1], 0:self.n_labels[i]]
+		
+		# Calculate the minimum along the 1st axis (columns) of _d, and the
+		#    0th axis (rows) of _t. 
+		_c_min_d  = np.min(_d, axis=1, keepdims=True)
+		_r_min_d  = np.min(_t, axis=0, keepdims=True)
 
-		return m_sum, min_l_d, min_l_t
+		# Tile these matrices so that they can be easily added. 
+		col_min_d = np.tile(_c_min_d, [1, self.n_labels[i]])
+		row_min_t = np.tile(_r_min_d, [self.n_labels[0], 1])
+
+		# Minsum is just the sum of these two matrices. 
+		m_sum     = col_min_d + row_min_t
+		
+		return m_sum
 		
 	def partial_minsum(self, i):
 		# Calculates the partial minsum for \Delta^+{i-1} and \theta^+_{i-1}
